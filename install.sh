@@ -12,7 +12,7 @@ XRAYR_BIN="${XRAYR_INSTALL_DIR}/XrayR"
 XRAYR_SERVICE_FILE="${XRAYR_SERVICE_FILE:-/etc/systemd/system/XrayR.service}"
 
 log() {
-    printf '[%s] %s\n' "$(date '+%F %T')" "$*"
+    printf '[%s] %s\n' "$(date '+%F %T')" "$*" >&2
 }
 
 fail() {
@@ -68,9 +68,9 @@ download_file() {
     local out="$2"
 
     if command_exists curl; then
-        curl -fL --connect-timeout 20 --retry 2 --retry-delay 1 -o "$out" "$url"
+        curl -fsSL --connect-timeout 20 --retry 2 --retry-delay 1 -o "$out" "$url"
     else
-        wget -O "$out" "$url"
+        wget -q -O "$out" "$url"
     fi
 }
 
