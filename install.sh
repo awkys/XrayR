@@ -10,6 +10,15 @@ XRAYR_INSTALL_DIR="${XRAYR_INSTALL_DIR:-/usr/local/XrayR}"
 XRAYR_CONFIG_DIR="${XRAYR_CONFIG_DIR:-/etc/XrayR}"
 XRAYR_BIN="${XRAYR_INSTALL_DIR}/XrayR"
 XRAYR_SERVICE_FILE="${XRAYR_SERVICE_FILE:-/etc/systemd/system/XrayR.service}"
+XRAYR_MIN_FREE_KB="${XRAYR_MIN_FREE_KB:-300000}"
+TMP_DIR=""
+
+cleanup() {
+    if [ -n "$TMP_DIR" ]; then
+        rm -rf "$TMP_DIR"
+    fi
+}
+trap cleanup EXIT
 
 log() {
     printf '[%s] %s\n' "$(date '+%F %T')" "$*" >&2
@@ -22,6 +31,32 @@ fail() {
 
 command_exists() {
     command -v "$1" >/dev/null 2>&1
+}
+
+existing_path() {
+    local path="$1"
+
+    while [ ! -e "$path" ] && [ "$path" != "/" ]; do
+        path="$(dirname "$path")"
+    done
+
+    printf '%s' "$path"
+}
+
+check_free_space() {
+    local path="$1"
+    local label="$2"
+    local free_kb=""
+
+    path="$(existing_path "$path")"
+    free_kb="$(df -Pk "$path" | awk 'NR == 2 {print $4}')"
+    if [ -z "$free_kb" ]; then
+        return 0
+    fi
+
+    if [ "$free_kb" -lt "$XRAYR_MIN_FREE_KB" ]; then
+        fail "Not enough free disk space on ${label} (${path}). Need at least ${XRAYR_MIN_FREE_KB} KB, available ${free_kb} KB."
+    fi
 }
 
 require_root() {
@@ -137,13 +172,20 @@ install_xrayr() {
 
     [ -n "$asset" ] || asset="$(detect_arch)"
 
-    tmp_dir="$(mktemp -d)"
+    check_free_space "${TMPDIR:-/tmp}" "temporary directory"
+    check_free_space "$XRAYR_INSTALL_DIR" "install directory"
+    check_free_space "$XRAYR_CONFIG_DIR" "config directory"
+
+    TMP_DIR="$(mktemp -d)"
+    tmp_dir="$TMP_DIR"
     extract_dir="${tmp_dir}/extract"
     archive="${tmp_dir}/${asset}"
     mkdir -p "$extract_dir"
 
     download_release_asset "$archive" "$asset"
-    unzip -q "$archive" -d "$extract_dir"
+    if ! unzip -oq "$archive" -d "$extract_dir" </dev/null; then
+        fail "Failed to extract ${asset}. Please check disk space with: df -h"
+    fi
 
     binary="$(find "$extract_dir" -type f -name XrayR | head -n 1)"
     [ -n "$binary" ] || fail "XrayR binary not found in ${asset}."
@@ -165,7 +207,7 @@ install_xrayr() {
     fi
 
     install_service
-    rm -rf "$tmp_dir"
+    "$XRAYR_BIN" version >/dev/null 2>&1 || fail "Installed XrayR binary cannot run."
 }
 
 main() {
