@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install XrayR from the public backup repository release asset.
+# Install XrayR from the public backup repository asset.
 
 set -euo pipefail
 
@@ -78,6 +78,15 @@ download_release_asset() {
     local archive="$1"
     local asset="$2"
     local url=""
+    local raw_url="https://raw.githubusercontent.com/${XRAYR_REPO}/master/${asset}"
+
+    if [ "$XRAYR_TAG" = "latest" ]; then
+        log "Downloading raw backup file: ${raw_url}"
+        if download_file "$raw_url" "$archive"; then
+            return 0
+        fi
+        log "Raw backup file not found, trying GitHub release asset."
+    fi
 
     if [ "$XRAYR_TAG" = "latest" ]; then
         url="https://github.com/${XRAYR_REPO}/releases/latest/download/${asset}"
@@ -90,9 +99,8 @@ download_release_asset() {
         return 0
     fi
 
-    url="https://raw.githubusercontent.com/${XRAYR_REPO}/master/${asset}"
-    log "Release asset not found, trying raw file: ${url}"
-    download_file "$url" "$archive"
+    log "Release asset not found, trying raw backup file: ${raw_url}"
+    download_file "$raw_url" "$archive"
 }
 
 install_service() {
