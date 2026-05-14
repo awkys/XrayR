@@ -75,10 +75,9 @@ download_file() {
 }
 
 download_release_asset() {
-    local tmp_dir="$1"
+    local archive="$1"
     local asset="$2"
     local url=""
-    local archive="${tmp_dir}/${asset}"
 
     if [ "$XRAYR_TAG" = "latest" ]; then
         url="https://github.com/${XRAYR_REPO}/releases/latest/download/${asset}"
@@ -88,14 +87,12 @@ download_release_asset() {
 
     log "Downloading ${url}"
     if download_file "$url" "$archive"; then
-        printf '%s' "$archive"
         return 0
     fi
 
     url="https://raw.githubusercontent.com/${XRAYR_REPO}/master/${asset}"
     log "Release asset not found, trying raw file: ${url}"
     download_file "$url" "$archive"
-    printf '%s' "$archive"
 }
 
 install_service() {
@@ -134,9 +131,10 @@ install_xrayr() {
 
     tmp_dir="$(mktemp -d)"
     extract_dir="${tmp_dir}/extract"
+    archive="${tmp_dir}/${asset}"
     mkdir -p "$extract_dir"
 
-    archive="$(download_release_asset "$tmp_dir" "$asset")"
+    download_release_asset "$archive" "$asset"
     unzip -q "$archive" -d "$extract_dir"
 
     binary="$(find "$extract_dir" -type f -name XrayR | head -n 1)"
