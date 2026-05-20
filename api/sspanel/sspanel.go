@@ -492,7 +492,7 @@ func (c *APIClient) ParseSSNodeResponse(nodeInfoResponse *NodeInfoResponse) (*ap
 			break
 		}
 	}
-	if port == 0 || method == "" {
+	if port == 0 {
 		return nil, fmt.Errorf("Cant find the single port multi user")
 	}
 
