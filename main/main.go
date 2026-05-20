@@ -67,7 +67,7 @@ func getConfig() *viper.Viper {
 func main() {
 	flag.Parse()
 	showVersion()
-	if *printVersion {
+	if *printVersion || (len(flag.Args()) > 0 && flag.Arg(0) == "version") {
 		return
 	}
 
