@@ -169,13 +169,8 @@ func (c *APIClient) GetNodeInfo() (nodeInfo *api.NodeInfo, err error) {
 
 	// New sspanel API
 	disableCustomConfig := c.DisableCustomConfig
-	if nodeInfoResponse.Version == "2021.11" && !disableCustomConfig {
-		// Check if custom_config is empty
-		if configString, err := json.Marshal(nodeInfoResponse.CustomConfig); err != nil || string(configString) == "[]" {
-			log.Printf("custom_config is empty! take config from address now.")
-			disableCustomConfig = true
-		}
-	} else {
+	if !disableCustomConfig && !hasSSPanelCustomConfig(nodeInfoResponse.CustomConfig) {
+		log.Printf("custom_config is empty! take config from address now.")
 		disableCustomConfig = true
 	}
 
@@ -567,6 +562,11 @@ func normalizeSSMethod(method string) string {
 	default:
 		return ""
 	}
+}
+
+func hasSSPanelCustomConfig(customConfig json.RawMessage) bool {
+	payload := strings.TrimSpace(string(customConfig))
+	return payload != "" && payload != "[]" && payload != "{}" && payload != "null"
 }
 
 // ParseSSPluginNodeResponse parse the response for the given nodeinfor format
