@@ -484,16 +484,27 @@ func (c *APIClient) ParseSSNodeResponse(nodeInfoResponse *NodeInfoResponse) (*ap
 	if err := json.Unmarshal(response.Data, userListResponse); err != nil {
 		return nil, fmt.Errorf("Unmarshal %s failed: %s", reflect.TypeOf(userListResponse), err)
 	}
+
+	if portFromServer := parseSSListenPort(nodeInfoResponse.RawServerString); portFromServer > 0 {
+		port = portFromServer
+	}
+
 	// Find the multi-user
 	for _, u := range *userListResponse {
 		if u.MultiUser > 0 {
-			port = u.Port
-			method = u.Method
-			break
+			if port == 0 {
+				port = u.Port
+			}
+			if method == "" {
+				method = normalizeSSMethod(u.Method)
+			}
 		}
 	}
 	if port == 0 {
 		return nil, fmt.Errorf("Cant find the single port multi user")
+	}
+	if method == "" {
+		method = "aes-128-gcm"
 	}
 
 	if c.SpeedLimit > 0 {
@@ -512,6 +523,50 @@ func (c *APIClient) ParseSSNodeResponse(nodeInfoResponse *NodeInfoResponse) (*ap
 	}
 
 	return nodeinfo, nil
+}
+
+func parseSSListenPort(server string) int {
+	if server == "" {
+		return 0
+	}
+
+	if result := firstPortRe.FindStringSubmatch(server); len(result) > 1 {
+		return parseIntPort(result[1])
+	}
+
+	serverConf := strings.Split(server, ";")
+	if len(serverConf) > 1 {
+		return parseIntPort(serverConf[1])
+	}
+
+	return 0
+}
+
+func parseIntPort(raw string) int {
+	port, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || port <= 0 || port > 65535 {
+		return 0
+	}
+
+	return port
+}
+
+func normalizeSSMethod(method string) string {
+	method = strings.ToLower(strings.TrimSpace(method))
+	switch method {
+	case "", "none", "plain", "null", "default", "auto", "0":
+		return ""
+	case "aes-128-gcm", "aes-256-gcm", "chacha20-poly1305", "chacha20-ietf-poly1305":
+		return method
+	case "aead_aes_128_gcm":
+		return "aes-128-gcm"
+	case "aead_aes_256_gcm":
+		return "aes-256-gcm"
+	case "aead_chacha20_poly1305":
+		return "chacha20-poly1305"
+	default:
+		return ""
+	}
 }
 
 // ParseSSPluginNodeResponse parse the response for the given nodeinfor format
